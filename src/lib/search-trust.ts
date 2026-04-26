@@ -1,0 +1,3 @@
+import type { RankedJob } from "@/types";
+export type ResultsSummary = { totalJobs: number; strongMatches: number; resumeLabel: string; providerLabel: string; providerTone: string; };
+export function buildResultsSummary({ results, providerStatuses, usedFallback, hasResume }: { results: RankedJob[]; providerStatuses?: any[]; usedFallback?: boolean; hasResume: boolean; }): ResultsSummary { return { totalJobs: results.length, strongMatches: results.filter(j => j.matchScore >= 80).length, resumeLabel: hasResume ? "Resume active" : "No resume", providerLabel: usedFallback ? "Sample data" : "Live data", providerTone: usedFallback ? "fallback" : "live" }; }
