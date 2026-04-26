@@ -1,27 +1,20 @@
 import Link from "next/link";
-import type { ResumeTemplateConfig } from "@/types/documents";
-import { LockKeyhole } from "lucide-react";
-import { TemplatePreviewThumbnail } from "@/components/documents/template-preview-thumbnail";
-import { getTemplatePresentation } from "@/lib/template-presentation";
 import type { Route } from "next";
-
-type TemplateCardProps = {
-  template: ResumeTemplateConfig | any;
-  href: Route;
-  premiumLocked?: boolean;
-};
-
-export function TemplateCard({ template, href, premiumLocked }: TemplateCardProps) {
+import { LockKeyhole, Sparkles, ArrowRight } from "lucide-react";
+import type { ResumeTemplateConfig, CoverLetterTemplateConfig } from "@/types/documents";
+import { getTemplatePresentation } from "@/lib/template-presentation";
+type TemplateCardProps = { template: ResumeTemplateConfig | CoverLetterTemplateConfig; href: Route; premiumLocked?: boolean; };
+export function TemplateCard({ template, href, premiumLocked = false }: TemplateCardProps) {
   const presentation = getTemplatePresentation(template);
+  const isPremium = template.metadata.tier === "PREMIUM";
   return (
-    <div className="relative rounded-[2rem] overflow-hidden border border-slate-150 shadow-sm hover:shadow-md transition-all">
-      <TemplatePreviewThumbnail template={template} />
-      {premiumLocked && <div className="absolute inset-0 bg-white/60 flex items-center justify-center"><LockKeyhole className="h-6 w-6 text-slate-600" /></div>}
-      <div className="p-4">
-        <h3 className="font-semibold text-slate-900 text-sm">{template.metadata.name}</h3>
-        <p className="text-xs text-slate-500 mt-1">{presentation.familyLabel}</p>
-        <Link href={href} className="mt-3 block text-center py-1.5 px-4 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Use Template</Link>
+    <Link href={href} className="group relative flex flex-col rounded-[2rem] border border-slate-150 p-5 shadow-sm hover:siØow-md transition-all">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{presentation.familyLabel}</p>
+      <p className="mt-1 text-xl font-semibold text-slate-950">{template.metadata.name}</p>
+      <div className="mt-3 flex items-center justify-between">
+        {isPremium ? <span className="flex items-center gap-1 text-xs font-semibold"><LockKeyhole className="h-3 w-3"/>Premium</span> : <span className="flex items-center gap-1 text-xs font-semibold text-slate-500"><Sparkles className="h4 w-4"/>Free</span>}
+        <span className="flex items-center gap-1 text-xs font-medium text-indigo-600">{{premiumLocked ? "Upgrade" : "Use"}}<ArrowRight className="h4 w-4"/></span>
       </div>
-    </div>
+    </Link>
   );
 }
