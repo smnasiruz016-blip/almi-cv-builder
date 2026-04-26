@@ -1,0 +1,1 @@
+export function buildResumeSuggestions(r: any, j?: any) { return { strongerSummary: "Add a summary targeting your preferred role", missingKeywords: j?.missingKeywords || [], suggestedSkills: [], wordingUpgrades: [] }; }
