@@ -5,33 +5,28 @@ import { jsonError } from "@/lib/http";
 import { loginSchema } from "@/lib/validation";
 
 export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const parsed = loginSchema.safeParse(body);
+  const body = await request.json();
+  const parsed = loginSchema.safeParse(body);
 
-    if (!parsed.success) {
-      return jsonError(parsed.error.issues[0]?.message ?? "Invalid login payload.");
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: parsed.data.email.toLowerCase() }
-    });
-
-    if (!user) {
-      return jsonError("Invalid email or password.", 401);
-    }
-
-    const isValid = await verifyPassword(parsed.data.password, user.passwordHash);
-
-    if (!isValid) {
-      return jsonError("Invalid email or password.", 401);
-    }
-
-    await createSession(user.id);
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("login route failed", error);
-    return jsonError("Login failed.", 500);
+  if (!parsed.success) {
+    return jsonError(parsed.error.issues[0]?.message ?? "Invalid login payload.");
   }
+
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email.toLowerCase() }
+  });
+
+  if (!user) {
+    return jsonError("Invalid email or password.", 401);
+  }
+
+  const isValid = await verifyPassword(parsed.data.password, user.passwordHash);
+
+  if (!isValid) {
+    return jsonError("Invalid email or password.", 401);
+  }
+
+  await createSession(user.id);
+
+  return NextResponse.json({ ok: true });
 }
