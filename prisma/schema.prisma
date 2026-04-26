@@ -1,0 +1,263 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
+enum DocumentStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum TemplateTier {
+  FREE
+  PREMIUM
+}
+
+enum ResumeTemplateFamily {
+  MINIMAL_ATS
+  MODERN_PROFESSIONAL
+  BOLD_STARTUP
+  CREATIVE_PORTFOLIO
+  COMPACT_ONE_PAGE
+  ACADEMIC_CLEAN
+}
+
+enum CoverLetterTemplateFamily {
+  CLASSIC_PROFESSIONAL
+  MODERN_CLEAN
+  MINIMAL_ATS
+  BOLD_CONTEMPORARY
+}
+
+enum ExportKind {
+  RESUME_PDF
+  COVER_LETTER_PDF
+}
+
+enum ExportStatus {
+  QUEUED
+  COMPLETED
+  FAILED
+}
+
+enum RemoteMode {
+  REMOTE
+  HYBRID
+  ONSITE
+  FLEXIBLE
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  TEMPORARY
+}
+
+enum AlertFrequency {
+  DAILY
+  WEEKLY
+}
+
+model User {
+  id            String          @id @default(cuid())
+  name          String
+  email         String          @unique
+  passwordHash  String
+  role          UserRole        @default(USER)
+  subscriptionTier SubscriptionTier @default(FREE)
+  sessions      Session[]
+  resumes       Resume[]
+  coverLetters  CoverLetter[]
+  resumeVersions ResumeVersion[]
+  exportLogs    ExportLog[]
+  searches      JobSearch[]
+  searchHistory SearchHistory[]
+  savedJobs     SavedJob[]
+  savedSearches SavedSearch[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Resume {
+  id                String   @id @default(cuid())
+  userId            String
+  title             String   @default("Untitled CV")
+  slug              String?
+  templateKey       String   @default("minimal-ats")
+  templateFamily    ResumeTemplateFamily @default(MINIMAL_ATS)
+  templateTier      TemplateTier @default(FREE)
+  status            DocumentStatus @default(DRAFT)
+  photoEnabled      Boolean  @default(true)
+  accentColor       String?
+  draftData         Json?
+  sectionOrder      String[] @default([])
+  hiddenSections    String[] @default([])
+  originalFilename  String?
+  storagePath       String?
+  mimeType          String?
+  extractedText     String?  @db.Text
+  parsedName        String?
+  parsedEmail       String?
+  parsedPhone       String?
+  skills            String[] @default([])
+  experienceKeywords String[] @default([])
+  educationKeywords String[] @default([])
+  preferredRoles    String[] @default([])
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions          ResumeVersion[]
+  exportLogs        ExportLog[]
+  coverLetters      CoverLetter[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model CoverLetter {
+  id             String   @id @default(cuid())
+  userId         String
+  resumeId       String?
+  title          String   @default("Untitled Cover Letter")
+  templateKey    String   @default("classic-professional")
+  templateFamily CoverLetterTemplateFamily @default(CLASSIC_PROFESSIONAL)
+  templateTier   TemplateTier @default(FREE)
+  status         DocumentStatus @default(DRAFT)
+  draftData      Json
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume         Resume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  exportLogs     ExportLog[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model ResumeVersion {
+  id         String   @id @default(cuid())
+  userId     String
+  resumeId   String
+  label      String   @default("Draft")
+  snapshot   Json
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume     Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId, createdAt])
+}
+
+model ExportLog {
+  id             String       @id @default(cuid())
+  userId         String
+  resumeId       String?
+  coverLetterId  String?
+  kind           ExportKind
+  status         ExportStatus @default(QUEUED)
+  fileUrl        String?
+  meta           Json?
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume         Resume?      @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  coverLetter    CoverLetter? @relation(fields: [coverLetterId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model JobSearch {
+  id             String           @id @default(cuid())
+  userId         String
+  desiredTitle   String
+  keyword        String?
+  company        String?
+  country        String
+  state          String?
+  city           String?
+  remoteMode     RemoteMode?
+  employmentType EmploymentType?
+  postedWithinDays Int?
+  salaryMin      Int?
+  salaryMax      Int?
+  latestResults  Json?
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history        SearchHistory[]
+  createdAt      DateTime         @default(now())
+}
+
+model SearchHistory {
+  id           String    @id @default(cuid())
+  userId       String
+  searchId     String?
+  snapshot     Json
+  resultsCount Int
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  search       JobSearch? @relation(fields: [searchId], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+}
+
+model SavedJob {
+  id            String   @id @default(cuid())
+  userId        String
+  externalJobId String
+  source        String
+  title         String
+  company       String
+  location      String
+  applyUrl      String
+  payload       Json
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, externalJobId, source])
+}
+
+model SavedSearch {
+  id             String         @id @default(cuid())
+  userId         String
+  name           String
+  querySnapshot  Json
+  alertsEnabled  Boolean        @default(false)
+  alertFrequency AlertFrequency @default(DAILY)
+  lastAlertedAt  DateTime?
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+}
+
+model JobResultCache {
+  id            String   @id @default(cuid())
+  externalJobId String
+  source        String
+  title         String
+  company       String
+  location      String
+  postedDate    DateTime?
+  payload       Json
+  createdAt     DateTime @default(now())
+
+  @@unique([externalJobId, source])
+}
