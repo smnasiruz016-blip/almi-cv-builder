@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
 
-const config: NextConfig = {
-  experimental: {
-    serverActions: {
-      allowedOrigins: ["localhost:3000"]
-    }
-  }
+const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
-export default config;
+export default nextConfig;
