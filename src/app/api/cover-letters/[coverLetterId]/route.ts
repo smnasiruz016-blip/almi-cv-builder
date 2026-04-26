@@ -1,19 +1,48 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
-import { deleteCoverLetter, updateCoverLetter } from "@/server/services/document-service";
-import { validateCoverLetterUpdateBody } from "@/lib/validation/documents";
-export async function PATCH(req: Request, { params }: { params: Promise<{ coverLetterId: string }> }) {
-  const user = await requireUser();
-  const { coverLetterId } = await params;
-  const body = await req.json().catch(() => ({}));
-  const p = validateCoverLetterUpdateBody(body);
-  if (!p.success) return NextResponse.json({ error: "Invalid" }, { status: 400 });
-  const cl = await updateCoverLetter(user.id, coverLetterId, p.data);
-  return NextResponse.json(cl);
+import { getRequiredUser } from "@/lib/auth";
+import { updateCoverLetterSchema } from "@/lib/validation/documents";
+import { deleteCoverLetterForUser, updateCoverLetterForUser } from "@/server/services/document-service";
+
+type RouteContext = {
+  params: Promise<{
+    coverLetterId: string;
+  }>;
+};
+
+export async function PATCH(request: Request, context: RouteContext) {
+  try {
+    const user = await getRequiredUser();
+    const { coverLetterId } = await context.params;
+    const payload = updateCoverLetterSchema.parse(await request.json());
+
+    await updateCoverLetterForUser(user.id, coverLetterId, payload);
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json(
+      {
+        code: "SAVE_COVER_LETTER_FAILED",
+        message: "We couldn't save your cover letter changes. Please try again."
+      },
+      { status: 400 }
+    );
+  }
 }
-export async function DELETE(_r: Request, { params }: { params: Promise<{ coverLetterId: string }> }) {
-  const user = await requireUser();
-  const { coverLetterId } = await params;
-  await deleteCoverLetter(user.id, coverLetterId);
-  return NextResponse.json({ success: true });
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const user = await getRequiredUser();
+    const { coverLetterId } = await context.params;
+    await deleteCoverLetterForUser(user.id, coverLetterId);
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json(
+      {
+        code: "DELETE_COVER_LETTER_FAILED",
+        message: "We couldn't delete that cover letter. Please try again."
+      },
+      { status: 400 }
+    );
+  }
 }

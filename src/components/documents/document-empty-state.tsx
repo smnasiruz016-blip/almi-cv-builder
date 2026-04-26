@@ -12,7 +12,7 @@ type DocumentEmptyStateProps = {
 export function DocumentEmptyState({ title, description, href, ctaLabel }: DocumentEmptyStateProps) {
   return (
     <div className="glass-panel rounded-[2rem] border border-dashed border-slate-200 p-8 text-center">
-      <div className="mx-auto fleh h-14 w-14 items-center justify-center rounded-full bg-teal-50 text-teal-700">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-50 text-teal-700">
         <FilePlus2 className="h-6 w-6" />
       </div>
       <h3 className="mt-4 font-[family-name:var(--font-display)] text-2xl font-semibold text-slate-950">{title}</h3>

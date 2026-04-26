@@ -3,9 +3,41 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/forms/auth-form";
 import { getCurrentUser } from "@/lib/auth";
-import { CheckCircle2 } from "lucide-react";
-const benefits = ["10 CV templates -- free to start", "Live preview as you type", "Create matching cover letters", "AI writing suggestions", "Export-ready structure", "No credit card needed"];
+
 export default async function SignUpPage() {
   const user = await getCurrentUser();
-  if (user) redirect("/dashboard");
-  return (<main style={{ minHeight: "100vh", display: "flex", alignItems: "center", position: "relative", zIndex: 1 }}><div className="page-shell" style={{ padding: "2rem 0", width: "100%" }}><div style={{ display: "grid", gap: "2rem", alignItems: "center", maxWidth: "960px", margin: "0 auto" }} className="lg:grid-cols-2"><div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}><a href="https://www.almiworld.com"><Image src="/brand/almi-latest.png" alt="Almiworld" width={130} height={48} style={{ height: "34px", width: "auto" }} /></a><div><h1 style={{ fontSize: "clamp(1.8rem,4vw,2.8rem)", fontWeight: 800, marginBottom: "0.75rem" }}>Build your CV<br /><span style={{ background: "linear-gradient(135deg,#00e5b8,#4f93ff)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>100% free</span></h1><p style={{ fontSize: "0.95rem", color: "var(--text2)", lineHeight: 1.7 }}>Create a professional CV and matching cover letter with premium templates and live preview.</p></div><div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>{benefits.map((b) => (<div key={b} style={{ display: "flex", alignItems: "center", gap: "10px" }}><CheckCircle2 style={{ width: 16, height: 16, color: "var(--primary)", flexShrink: 0 }} /><span style={{ fontSize: "0.88rem", color: "var(--text2)" }}>{b}</span></div>))}</div><p style={{ fontSize: "0.8rem", color: "var(--text3)" }}>Already have an account?{" "}<Link href="/login" style={{ color: "var(--primary)", fontWeight: 600 }}>Log in →</Link></p></div><div className="glass-panel" style={{ borderRadius: "20px", padding: "2rem", border: "1px solid rgba(0,229,184,0.1)" }}><h2 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: "0.4rem" }}>Create your account</h2><p style={{ fontSize: "0.82rem", color: "var(--text3)", marginBottom: "1.5rem" }}>Free forever - no credit card</p><AuthForm mode="signup" /><p style={{ marginTop: "1.25rem", textAlign: "center", fontSize: "0.82rem", color: "var(--text3)" }}>Already have an account?{" "}<Link href="/login" style={{ color: "var(--primary)", fontWeight: 600 }}>Log in</Link></p></div></div></div></main>);}
+
+  if (user) {
+    redirect("/dashboard");
+  }
+
+  return (
+    <main className="page-shell py-16">
+      <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+        <section className="glass-panel rounded-[2rem] p-8">
+          <Image src="/brand/almi-latest.png" alt="Almiworld" width={180} height={70} className="h-auto w-[150px]" />
+          <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-bold text-slate-950">
+            Create your Almi CV account
+          </h1>
+          <p className="mt-3 text-sm leading-7 text-slate-600">
+            Start building professional CVs and matching cover letters with polished templates, live previews, and saved drafts.
+          </p>
+          <ul className="mt-5 space-y-2 text-sm leading-7 text-slate-600">
+            <li>- Choose from premium-feeling CV templates</li>
+            <li>- Build matching cover letters faster</li>
+            <li>- Save drafts and keep improving over time</li>
+          </ul>
+        </section>
+        <div>
+          <AuthForm mode="signup" />
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Already have an account?{" "}
+            <Link href="/login" className="font-semibold text-teal-700">
+              Log in
+            </Link>
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}

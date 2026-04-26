@@ -1,19 +1,48 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
-import { deleteResume, updateResume } from "@/server/services/document-service";
-import { validateResumeUpdateBody } from "@/lib/validation/documents";
-export async function PATCH(req: Request, { params }: { params: Promise<{ resumeId: string }> }) {
-  const user = await requireUser();
-  const { resumeId } = await params;
-  const body = await req.json().catch(() => ({}));
-  const p = validateResumeUpdateBody(body);
-  if (!p.success) return NextResponse.json({ error: "Invalid" }, { status: 400 });
-  const resume = await updateResume(user.id, resumeId, p.data);
-  return NextResponse.json(resume);
+import { getRequiredUser } from "@/lib/auth";
+import { updateResumeSchema } from "@/lib/validation/documents";
+import { deleteResumeForUser, updateResumeForUser } from "@/server/services/document-service";
+
+type RouteContext = {
+  params: Promise<{
+    resumeId: string;
+  }>;
+};
+
+export async function PATCH(request: Request, context: RouteContext) {
+  try {
+    const user = await getRequiredUser();
+    const { resumeId } = await context.params;
+    const payload = updateResumeSchema.parse(await request.json());
+
+    await updateResumeForUser(user.id, resumeId, payload);
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json(
+      {
+        code: "SAVE_RESUME_FAILED",
+        message: "We couldn't save your CV changes. Please try again."
+      },
+      { status: 400 }
+    );
+  }
 }
-export async function DELETE(_r: Request, { params }: { params: Promise<{ resumeId: string }> }) {
-  const user = await requireUser();
-  const { resumeId } = await params;
-  await deleteResume(user.id, resumeId);
-  return NextResponse.json({ success: true });
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const user = await getRequiredUser();
+    const { resumeId } = await context.params;
+    await deleteResumeForUser(user.id, resumeId);
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json(
+      {
+        code: "DELETE_RESUME_FAILED",
+        message: "We couldn't delete that CV. Please try again."
+      },
+      { status: 400 }
+    );
+  }
 }

@@ -1,28 +1,32 @@
 import { NextResponse } from "next/server";
-import { log } from "@/lib/logger";
+import { createSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { validateLoginBody } from "@/lib/validation";
-import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
-import { randomUUID } from "crypto";
-import { createHash } from "crypto";
+import { jsonError } from "@/lib/http";
+import { loginSchema } from "@/lib/validation";
 
-export async function POST(req: Request) {
-  log("info", "auth.login.start");
-  const body = await req.json().catch(() => ({}));
-  const parsed = validateLoginBody(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { email, password } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-  const match = await bcrypt.compare(password, user.passwordHash);
-  if (!match) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-  const token = randomUUID();
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  await prisma.session.create({ data: { userId: user.id, tokenHash, expiresAt } });
-  const cookieStore = await cookies();
-  cookieStore.set("session", token, { httpOnly: true, sameSite: "lax", path: "/", expires: expiresAt, secure: process.env.NODE_ENV === "production" });
-  log("info", "auth.login.success", { userId: user.id });
-  return NextResponse.json({ success: true, userId: user.id });
+export async function POST(request: Request) {
+  const body = await request.json();
+  const parsed = loginSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return jsonError(parsed.error.issues[0]?.message ?? "Invalid login payload.");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: parsed.data.email.toLowerCase() }
+  });
+
+  if (!user) {
+    return jsonError("Invalid email or password.", 401);
+  }
+
+  const isValid = await verifyPassword(parsed.data.password, user.passwordHash);
+
+  if (!isValid) {
+    return jsonError("Invalid email or password.", 401);
+  }
+
+  await createSession(user.id);
+
+  return NextResponse.json({ ok: true });
 }

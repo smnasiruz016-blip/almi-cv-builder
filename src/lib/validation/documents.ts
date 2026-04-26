@@ -1,11 +1,100 @@
 import { z } from "zod";
-const ot = z.string().trim().optional().default("");
-const rt = z.string().trim().min(1);
-export const resumeDataSchema = z.object({ basics: z.object({ fullName: ot, professionalTitle: ot, email: ot, phone: ot, location: ot, website: ot, linkedIn: ot, photoUrl: ot }), summary: ot, experience: z.array(z.object({ id: rt, role: ot, company: ot, location: ot, startDate: ot, endDate: ot, bullets: z.array(z.string()).default([]) })).default([]), education: z.array(z.object({ id: rt, degree: ot, school: ot, location: ot, startDate: ot, endDate: ot, details: ot })).default([]), skills: z.array(z.string()).default([]), projects: z.array(z.any()).default([]), certifications: z.array(z.any()).default([]), links: z.array(z.any()).default([]) });
-export const coverLetterDataSchema = z.object({ jobTitle: ot, company: ot, hiringManager: ot, intro: ot, body: ot, closing: ot });
-export const updateResumeSchema = z.object({ title: z.string().trim().min(1).max(80), templateKey: z.string(), photoEnabled: z.boolean().default(true), accentColor: z.string().optional().nullable(), sectionOrder: z.array(z.string()).default([]), hiddenSections: z.array(z.string()).default([]), draftData: resumeDataSchema });
-export const updateCoverLetterSchema = z.object({ title: z.string().trim().min(1).max(80), templateKey: z.string(), draftData: coverLetterDataSchema });
-export function validateResumeUpdateBody(body: unknown) { return updateResumeSchema.safeParse(body); }
-export function validateCoverLetterUpdateBody(body: unknown) { return updateCoverLetterSchema.safeParse(body); }
-export function validateSignupBody(b: unknown) { return z.object({ name: z.string().min(2), email: z.string().email(), password: z.string().min(8) }).safeParse(b); }
-export function validateLoginBody(b: unknown) { return z.object({ email: z.string().email(), password: z.string().min(8) }).safeParse(b); }
+
+const requiredTrimmed = z.string().trim().min(1);
+const optionalTrimmed = z.string().trim().optional().default("");
+
+export const resumeBasicsSchema = z.object({
+  fullName: optionalTrimmed,
+  professionalTitle: optionalTrimmed,
+  email: optionalTrimmed,
+  phone: optionalTrimmed,
+  location: optionalTrimmed,
+  website: optionalTrimmed,
+  linkedIn: optionalTrimmed,
+  photoUrl: optionalTrimmed
+});
+
+export const resumeExperienceItemSchema = z.object({
+  id: requiredTrimmed,
+  role: optionalTrimmed,
+  company: optionalTrimmed,
+  location: optionalTrimmed,
+  startDate: optionalTrimmed,
+  endDate: optionalTrimmed,
+  bullets: z.array(z.string().trim()).default([])
+});
+
+export const resumeEducationItemSchema = z.object({
+  id: requiredTrimmed,
+  degree: optionalTrimmed,
+  school: optionalTrimmed,
+  location: optionalTrimmed,
+  startDate: optionalTrimmed,
+  endDate: optionalTrimmed,
+  details: optionalTrimmed
+});
+
+export const resumeProjectItemSchema = z.object({
+  id: requiredTrimmed,
+  name: optionalTrimmed,
+  role: optionalTrimmed,
+  link: optionalTrimmed,
+  bullets: z.array(z.string().trim()).default([])
+});
+
+export const resumeCertificationItemSchema = z.object({
+  id: requiredTrimmed,
+  name: optionalTrimmed,
+  issuer: optionalTrimmed,
+  year: optionalTrimmed
+});
+
+export const resumeLinkItemSchema = z.object({
+  id: requiredTrimmed,
+  label: optionalTrimmed,
+  url: optionalTrimmed
+});
+
+export const resumeDataSchema = z.object({
+  basics: resumeBasicsSchema,
+  summary: optionalTrimmed,
+  experience: z.array(resumeExperienceItemSchema).default([]),
+  education: z.array(resumeEducationItemSchema).default([]),
+  skills: z.array(z.string().trim()).default([]),
+  projects: z.array(resumeProjectItemSchema).default([]),
+  certifications: z.array(resumeCertificationItemSchema).default([]),
+  links: z.array(resumeLinkItemSchema).default([])
+});
+
+export const createResumeSchema = z.object({
+  templateKey: z.string().trim().min(1).optional().default("minimal-ats")
+});
+
+export const updateResumeSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  templateKey: z.string().trim().min(1),
+  photoEnabled: z.boolean().default(true),
+  accentColor: z.string().trim().optional().nullable(),
+  sectionOrder: z.array(z.string()).default([]),
+  hiddenSections: z.array(z.string()).default([]),
+  draftData: resumeDataSchema
+});
+
+export const coverLetterDataSchema = z.object({
+  jobTitle: optionalTrimmed,
+  company: optionalTrimmed,
+  hiringManager: optionalTrimmed,
+  intro: optionalTrimmed,
+  body: optionalTrimmed,
+  closing: optionalTrimmed
+});
+
+export const createCoverLetterSchema = z.object({
+  templateKey: z.string().trim().min(1).optional().default("classic-professional")
+});
+
+export const updateCoverLetterSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  templateKey: z.string().trim().min(1),
+  draftData: coverLetterDataSchema
+});

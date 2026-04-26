@@ -1,17 +1,86 @@
-import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getRequiredUser } from "@/lib/auth";
+import { trackProductEvent } from "@/lib/analytics";
 import { prisma } from "@/lib/prisma";
+import { jsonError } from "@/lib/http";
 import { savedJobSchema } from "@/lib/validation";
-export async function GET() {
-  const user = await requireUser();
-  const jobs = await prisma.savedJob.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" } });
-  return NextResponse.json(jobs);
-}
-export async function POST(req: Request) {
-  const user = await requireUser();
-  const body = await req.json().catch(() => ({}));
+
+export async function POST(request: Request) {
+  let user;
+
+  try {
+    user = await getRequiredUser();
+  } catch {
+    return jsonError("Unauthorized.", 401);
+  }
+
+  const body = await request.json();
   const parsed = savedJobSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid" }, { status: 400 });
-  const job = await prisma.savedJob.create({ data: { userId: user.id, externalJobId> parsed.data.externalJobId= source: parsed.data.source, title: parsed.data.title, company: parsed.data.company, location: parsed.data.location, applyUrl: parsed.data.applyUrl, payload: parsed.data } });
-  return NextResponse.json(job);
+
+  if (!parsed.success) {
+    return jsonError(parsed.error.issues[0]?.message ?? "Job payload is incomplete.");
+  }
+
+  const job = parsed.data;
+
+  const savedJob = await prisma.savedJob.upsert({
+    where: {
+      userId_externalJobId_source: {
+        userId: user.id,
+        externalJobId: job.externalJobId,
+        source: job.source
+      }
+    },
+    update: {
+      payload: job
+    },
+    create: {
+      userId: user.id,
+      externalJobId: job.externalJobId,
+      source: job.source,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      applyUrl: job.applyUrl,
+      payload: job
+    }
+  });
+
+  await trackProductEvent({
+    name: "job_saved",
+    userId: user.id,
+    properties: {
+      source: job.source,
+      externalJobId: job.externalJobId,
+      title: job.title,
+      company: job.company
+    }
+  });
+
+  return Response.json({ savedJob });
+}
+
+export async function DELETE(request: Request) {
+  let user;
+
+  try {
+    user = await getRequiredUser();
+  } catch {
+    return jsonError("Unauthorized.", 401);
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return jsonError("Saved job id is required.");
+  }
+
+  await prisma.savedJob.deleteMany({
+    where: {
+      id,
+      userId: user.id
+    }
+  });
+
+  return Response.json({ ok: true });
 }

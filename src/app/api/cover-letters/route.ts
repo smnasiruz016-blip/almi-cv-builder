@@ -1,9 +1,24 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { getRequiredUser } from "@/lib/auth";
+import { createCoverLetterSchema } from "@/lib/validation/documents";
 import { createCoverLetterForUser } from "@/server/services/document-service";
-export async function POST(req: Request) {
-  const user = await requireUser();
-  const body = await req.json().catch(() => ({}));
-  const coverLetter = await createCoverLetterForUser(user.id, body.templateKey);
-  return NextResponse.json(coverLetter);
+
+export async function POST(request: Request) {
+  try {
+    const user = await getRequiredUser();
+    const payload = createCoverLetterSchema.parse(await request.json());
+    const coverLetter = await createCoverLetterForUser(user.id, payload.templateKey);
+
+    return NextResponse.json({
+      coverLetterId: coverLetter.id
+    });
+  } catch {
+    return NextResponse.json(
+      {
+        code: "CREATE_COVER_LETTER_FAILED",
+        message: "We couldn't start that cover letter yet. Please try again."
+      },
+      { status: 400 }
+    );
+  }
 }

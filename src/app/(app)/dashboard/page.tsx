@@ -7,7 +7,29 @@ export default async function DashboardPage() {
   const user = await requireUser();
   let resumes: Awaited<ReturnType<typeof listDocumentsForDashboard>>["resumes"] = [];
   let coverLetters: Awaited<ReturnType<typeof listDocumentsForDashboard>>["coverLetters"] = [];
-  try { const documents = await listDocumentsForDashboard(user.id); resumes = documents.resumes; coverLetters = documents.coverLetters; } catch { resumes = []; coverLetters = []; }
+
+  try {
+    const documents = await listDocumentsForDashboard(user.id);
+    resumes = documents.resumes;
+    coverLetters = documents.coverLetters;
+  } catch {
+    resumes = [];
+    coverLetters = [];
+  }
   const plan = getPlanDefinition(user.subscriptionTier);
-  return (<DashboardShell userName={user.name} resumes={resumes.map((item) => ({...item, updatedAt: item.updatedAt.toISOString()}))} coverLetters={coverLetters.map((item) => ({...item, updatedAt: item.updatedAt.toISOString()}))} plan={plan} />);
+
+  return (
+    <DashboardShell
+      userName={user.name}
+      resumes={resumes.map((item) => ({
+        ...item,
+        updatedAt: item.updatedAt.toISOString()
+      }))}
+      coverLetters={coverLetters.map((item) => ({
+        ...item,
+        updatedAt: item.updatedAt.toISOString()
+      }))}
+      plan={plan}
+    />
+  );
 }

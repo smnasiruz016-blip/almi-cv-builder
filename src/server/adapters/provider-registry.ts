@@ -1,37 +1,431 @@
-import { filterJobsBySearchLocation } from "@/lib/location";
+import { filterJobsBySearchLocation, mapCountryToAdzunaCode, matchesSearchLocation } from "@/lib/location";
 import { log } from "@/lib/logger";
 import { getProviderRuntimeConfig } from "@/server/adapters/provider-config";
 import type { JobSourceAdapter } from "@/server/adapters/types";
 import { mockAdapters } from "@/server/adapters/mock-jobs";
 import type { JobSearchInput, NormalizedJob, ProviderStatus } from "@/types";
 
+function sanitizeRemoteOkJobs(payload: unknown): RemoteOkApiJob[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.filter((item): item is RemoteOkApiJob => typeof item === "object" && item !== null && "id" in item);
+}
+
+type RemoteOkApiJob = {
+  id: number | string;
+  position?: string;
+  company?: string;
+  location?: string;
+  url?: string;
+  salary_min?: number;
+  salary_max?: number;
+  description?: string;
+  tags?: string[];
+  date?: string;
+};
+
+type AdzunaApiJob = {
+  id: string;
+  title?: string;
+  company?: { display_name?: string };
+  location?: { display_name?: string };
+  redirect_url?: string;
+  salary_min?: number;
+  salary_max?: number;
+  description?: string;
+  created?: string;
+  contract_time?: string;
+};
+
+type RemotiveApiResponse = {
+  jobs?: RemotiveApiJob[];
+};
+
+type RemotiveApiJob = {
+  id: number | string;
+  title?: string;
+  company_name?: string;
+  candidate_required_location?: string;
+  url?: string;
+  publication_date?: string;
+  job_type?: string;
+  salary?: string;
+  description?: string;
+  tags?: string[];
+};
+
+function sanitizeRemotiveJobs(payload: unknown): RemotiveApiJob[] {
+  if (!payload || typeof payload !== "object" || !("jobs" in payload)) {
+    return [];
+  }
+
+  const jobs = (payload as RemotiveApiResponse).jobs;
+  if (!Array.isArray(jobs)) {
+    return [];
+  }
+
+  return jobs.filter((item): item is RemotiveApiJob => typeof item === "object" && item !== null && "id" in item);
+}
+
+function buildDescriptionSnippet(value: string | undefined, fallback: string) {
+  const snippet = (value ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'")
+    .replace(/[Â�]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
+
+  return snippet || fallback;
+}
+
+function textMatchesQuery(value: string, query?: string) {
+  const trimmed = (query ?? "").trim().toLowerCase();
+  if (!trimmed) {
+    return true;
+  }
+
+  return trimmed
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((part) => value.includes(part));
+}
+
+function matchesPostedWithin(postedDate: string | undefined, postedWithinDays?: number) {
+  if (!postedWithinDays) {
+    return true;
+  }
+
+  if (!postedDate) {
+    return false;
+  }
+
+  return Date.now() - new Date(postedDate).getTime() <= postedWithinDays * 24 * 60 * 60 * 1000;
+}
+
+export function normalizeRemoteOkJob(job: RemoteOkApiJob): NormalizedJob {
+  const keywords = job.tags ?? [];
+
+  return {
+    externalJobId: String(job.id),
+    source: "RemoteOK",
+    sourceType: "live",
+    title: job.position ?? "Remote role",
+    company: job.company ?? "Unknown company",
+    location: job.location ?? "Remote",
+    salaryMin: typeof job.salary_min === "number" ? job.salary_min : undefined,
+    salaryMax: typeof job.salary_max === "number" ? job.salary_max : undefined,
+    salary:
+      typeof job.salary_min === "number" || typeof job.salary_max === "number"
+        ? `$${job.salary_min ?? "?"} - $${job.salary_max ?? "?"}`
+        : undefined,
+    jobType: "FULL_TIME",
+    remoteStatus: "REMOTE",
+    descriptionSnippet: buildDescriptionSnippet(job.description, "Remote opportunity from Remote OK."),
+    applyUrl: job.url ?? "https://remoteok.com",
+    postedDate: job.date,
+    keywords,
+    providerMetadata: {
+      attributionLabel: "Source: Remote OK",
+      attributionUrl: job.url ?? "https://remoteok.com"
+    }
+  };
+}
+
+export function normalizeAdzunaJob(job: AdzunaApiJob, input: JobSearchInput): NormalizedJob {
+  return {
+    externalJobId: job.id,
+    source: "Adzuna",
+    sourceType: "live",
+    title: job.title ?? input.desiredTitle,
+    company: job.company?.display_name ?? "Unknown company",
+    location: job.location?.display_name ?? input.country ?? "Worldwide",
+    salaryMin: typeof job.salary_min === "number" ? Math.round(job.salary_min) : undefined,
+    salaryMax: typeof job.salary_max === "number" ? Math.round(job.salary_max) : undefined,
+    salary:
+      typeof job.salary_min === "number" || typeof job.salary_max === "number"
+        ? `$${Math.round(job.salary_min ?? 0)} - $${Math.round(job.salary_max ?? 0)}`
+        : undefined,
+    jobType: job.contract_time?.toUpperCase().replace("-", "_"),
+    remoteStatus: input.remoteMode,
+    descriptionSnippet: buildDescriptionSnippet(job.description, "Role supplied by Adzuna."),
+    applyUrl: job.redirect_url ?? "",
+    postedDate: job.created,
+    keywords: [input.desiredTitle, input.keyword, job.title ?? "", job.company?.display_name ?? ""].filter(Boolean) as string[],
+    providerMetadata: {
+      attributionLabel: "Source: Adzuna",
+      attributionUrl: job.redirect_url
+    }
+  };
+}
+
+export function normalizeRemotiveJob(job: RemotiveApiJob): NormalizedJob {
+  const keywords = [...(job.tags ?? []), job.company_name ?? "", job.title ?? ""].filter(Boolean) as string[];
+
+  return {
+    externalJobId: String(job.id),
+    source: "Remotive",
+    sourceType: "live",
+    title: job.title ?? "Remote role",
+    company: job.company_name ?? "Unknown company",
+    location: job.candidate_required_location ?? "Remote",
+    salary: job.salary?.trim() || undefined,
+    jobType: job.job_type?.toUpperCase().replace(/[-\s]+/g, "_"),
+    remoteStatus: "REMOTE",
+    descriptionSnippet: buildDescriptionSnippet(job.description, "Remote opportunity sourced from Remotive."),
+    applyUrl: job.url ?? "https://remotive.com/jobs",
+    postedDate: job.publication_date,
+    keywords,
+    providerMetadata: {
+      attributionLabel: "Source: Remotive",
+      attributionUrl: job.url ?? "https://remotive.com/jobs"
+    }
+  };
+}
+
 class RemoteOkAdapter implements JobSourceAdapter {
   source = "RemoteOK";
   sourceType = "live" as const;
-  isEnabled() { return getProviderRuntimeConfig().remoteOkEnabled; }
+
+  isEnabled() {
+    return getProviderRuntimeConfig().remoteOkEnabled;
+  }
+
   async searchJobs(input: JobSearchInput): Promise<NormalizedJob[]> {
     const config = getProviderRuntimeConfig();
-    const response = await fetch(config.remoteOkApiUrl, { headers: { Accept: "application/json" }, next: { revalidate: config.remoteOkRevalidateSeconds } });
-    if (!response.ok) throw new Error("RemoteOK failed: "+response.status);
-    const data = await response.json();
-    return (Array.isArray(data) ? data : []).map((j: any) => ({ externalJobId: String(j.id), source: "RemoteOK", sourceType: "live", title: j.position || "Remote role", company: j.company || "Unknown", location: j.location || "Remote", descriptionSnippet: (j.description || "").slice(0,240), applyUrl: j.url || "https://remoteok.com", keywords: j.tags || [], postedDate: j.date, providerMetadata: { attributionLabel: "RemoteOK", attributionUrl: j.url } })).filter((j: any) => j.title.toLowerCase().includes(input.desiredTitle.toLowerCase()));
+    const endpoint = config.remoteOkApiUrl;
+    const response = await fetch(endpoint, {
+      headers: {
+        Accept: "application/json"
+      },
+      next: { revalidate: config.remoteOkRevalidateSeconds }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Remote OK request failed with status ${response.status}`);
+    }
+
+    const data = sanitizeRemoteOkJobs(await response.json());
+    const titleNeedle = input.desiredTitle.trim().toLowerCase();
+    const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
+
+    return data
+      .map((job) => normalizeRemoteOkJob(job))
+      .filter((job) => {
+        const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
+        const titleMatch = titleNeedle ? haystack.includes(titleNeedle) : true;
+        const keywordMatch = keywordNeedle
+          ? haystack.includes(keywordNeedle) || keywordNeedle.split(" ").every((part) => haystack.includes(part))
+          : true;
+        const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
+        const salaryMatch = input.salaryMin ? (job.salaryMax ?? 0) >= input.salaryMin : true;
+        const postedMatch = input.postedWithinDays
+          ? Boolean(job.postedDate) &&
+            Date.now() - new Date(job.postedDate!).getTime() <= input.postedWithinDays * 24 * 60 * 60 * 1000
+          : true;
+        const locationMatch = matchesSearchLocation(job.location, input, job.descriptionSnippet);
+
+        return titleMatch && keywordMatch && companyMatch && salaryMatch && postedMatch && locationMatch;
+      });
   }
 }
 
-export function getJobAdapters() { return [new RemoteOkAdapter(), ...mockAdapters].filter(a => a.isEnabled()); }
+class RemotiveAdapter implements JobSourceAdapter {
+  source = "Remotive";
+  sourceType = "live" as const;
+
+  isEnabled() {
+    return getProviderRuntimeConfig().remotiveEnabled;
+  }
+
+  async searchJobs(input: JobSearchInput): Promise<NormalizedJob[]> {
+    const config = getProviderRuntimeConfig();
+    const url = new URL(config.remotiveApiUrl);
+    const query = [input.desiredTitle, input.keyword].filter(Boolean).join(" ").trim();
+
+    if (query) {
+      url.searchParams.set("search", query);
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json"
+      },
+      next: { revalidate: config.remotiveRevalidateSeconds }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Remotive request failed with status ${response.status}`);
+    }
+
+    const jobs = sanitizeRemotiveJobs(await response.json()).map((job) => normalizeRemotiveJob(job));
+    const titleNeedle = input.desiredTitle.trim().toLowerCase();
+    const keywordNeedle = (input.keyword ?? "").trim().toLowerCase();
+
+    return jobs.filter((job) => {
+      const haystack = `${job.title} ${job.descriptionSnippet} ${job.keywords.join(" ")}`.toLowerCase();
+      const titleMatch = textMatchesQuery(haystack, titleNeedle);
+      const keywordMatch = textMatchesQuery(haystack, keywordNeedle);
+      const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
+      const locationMatch = matchesSearchLocation(job.location, input, job.descriptionSnippet);
+      const postedMatch = matchesPostedWithin(job.postedDate, input.postedWithinDays);
+
+      return titleMatch && keywordMatch && companyMatch && locationMatch && postedMatch;
+    });
+  }
+}
+
+class AdzunaAdapter implements JobSourceAdapter {
+  source = "Adzuna";
+  sourceType = "live" as const;
+
+  isEnabled() {
+    const config = getProviderRuntimeConfig();
+    return config.adzunaEnabled && Boolean(config.adzunaAppId && config.adzunaAppKey);
+  }
+
+  async searchJobs(input: JobSearchInput): Promise<NormalizedJob[]> {
+    const config = getProviderRuntimeConfig();
+    const countryCode = mapCountryToAdzunaCode(input.country);
+
+    if (!countryCode) {
+      return [];
+    }
+
+    const url = new URL(`${config.adzunaApiUrl}/${countryCode}/search/1`);
+    url.searchParams.set("app_id", config.adzunaAppId!);
+    url.searchParams.set("app_key", config.adzunaAppKey!);
+    url.searchParams.set("results_per_page", "20");
+    url.searchParams.set("what", [input.desiredTitle, input.keyword].filter(Boolean).join(" "));
+
+    const where = [input.city, input.state, input.country].filter(Boolean).join(", ");
+    if (where) {
+      url.searchParams.set("where", where);
+    }
+
+    if (input.salaryMin) {
+      url.searchParams.set("salary_min", String(input.salaryMin));
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json"
+      },
+      next: { revalidate: 1800 }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Adzuna request failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { results?: AdzunaApiJob[] };
+    const results = Array.isArray(payload.results) ? payload.results : [];
+
+    return results
+      .map((job) => normalizeAdzunaJob(job, input))
+      .filter((job) => {
+        const companyMatch = input.company ? job.company.toLowerCase().includes(input.company.toLowerCase()) : true;
+        const postedMatch = matchesPostedWithin(job.postedDate, input.postedWithinDays);
+
+        return companyMatch && postedMatch;
+      });
+  }
+}
+
+export function getJobAdapters() {
+  return [new RemoteOkAdapter(), new RemotiveAdapter(), new AdzunaAdapter(), ...mockAdapters].filter((adapter) => adapter.isEnabled());
+}
 
 export async function fetchFromAdapters(input: JobSearchInput) {
   const adapters = getJobAdapters();
+  const config = getProviderRuntimeConfig();
+  const liveAdapters = adapters.filter((adapter) => adapter.sourceType === "live");
+  const mockOnlyAdapters = adapters.filter((adapter) => adapter.sourceType !== "live");
+
   const providerStatuses: ProviderStatus[] = [];
   const liveResults: NormalizedJob[] = [];
-  for (const adapter of adapters.filter(a => a.sourceType === "live")) {
+
+  for (const adapter of liveAdapters) {
     try {
       const jobs = filterJobsBySearchLocation(await adapter.searchJobs(input), input);
       liveResults.push(...jobs);
-      providerStatuses.push({ source: adapter.source, sourceType: "live", status: jobs.length ? "success" : "no_matches", results: jobs.length, message: "" });
-    } catch(error) {
-      providerStatuses.push({ source: adapter.source, sourceType: "live", status: "error", results: 0, message: "Provider unavailable" });
+      providerStatuses.push({
+        source: adapter.source,
+        sourceType: "live",
+        status: jobs.length ? "success" : "no_matches",
+        results: jobs.length,
+        message: jobs.length
+          ? "Live provider is active and returned matching jobs."
+          : "Live provider is active, but this search did not match anything yet."
+      });
+      log("info", "Live provider search completed", {
+        source: adapter.source,
+        results: jobs.length,
+        status: jobs.length ? "success" : "no_matches"
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      log("warn", "Live job adapter failed, continuing with other providers", {
+        source: adapter.source,
+        error: message
+      });
+      providerStatuses.push({
+        source: adapter.source,
+        sourceType: "live",
+        status: "error",
+        results: 0,
+        message: "This provider is temporarily unavailable. You can try again shortly."
+      });
     }
   }
-  return { jobs: liveResults, usedFallback: false, sources: [...new Set(liveResults.map(j => j.source))], providerStatuses };
+
+  const shouldUseFallback = liveResults.length === 0 && config.mockFallbackEnabled;
+  const fallbackJobs = shouldUseFallback
+    ? (await Promise.all(mockOnlyAdapters.map((adapter) => adapter.searchJobs(input)))).flat().filter((job) =>
+        matchesSearchLocation(job.location, input, job.descriptionSnippet)
+      )
+    : [];
+
+  if (shouldUseFallback) {
+    for (const adapter of mockOnlyAdapters) {
+      providerStatuses.push({
+        source: adapter.source,
+        sourceType: "mock",
+        status: "fallback",
+        results: fallbackJobs.filter((job) => job.source === adapter.source).length,
+        message: "Fallback coverage was used so you still have jobs to review."
+      });
+      log("info", "Fallback provider supplied jobs", {
+        source: adapter.source,
+        results: fallbackJobs.filter((job) => job.source === adapter.source).length
+      });
+    }
+  } else {
+    for (const adapter of mockOnlyAdapters) {
+      providerStatuses.push({
+        source: adapter.source,
+        sourceType: "mock",
+        status: "disabled",
+        results: 0,
+        message:
+          liveResults.length > 0
+            ? "Sample fallback stayed on standby because live providers returned results."
+            : config.mockFallbackEnabled
+              ? "Sample fallback stayed on standby because it was not needed."
+              : "Sample fallback is turned off for this environment so only live jobs are shown."
+      });
+    }
+  }
+
+  return {
+    jobs: shouldUseFallback ? fallbackJobs : liveResults,
+    usedFallback: shouldUseFallback,
+    sources: [...new Set((shouldUseFallback ? fallbackJobs : liveResults).map((job) => job.source))],
+    providerStatuses
+  };
 }

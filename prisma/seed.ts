@@ -34,7 +34,31 @@ async function main() {
       userId: demo.id,
       originalFilename: "demo-resume.pdf",
       storagePath: "seed/demo-resume.pdf",
-      mimeType: "application/pdf"
+      mimeType: "application/pdf",
+      extractedText:
+        "Taylor Morgan\nEmail: demo@almijobfinder.dev\nPhone: 555-010-2001\nSkills: TypeScript, React, Node.js, Prisma, Product Design, Figma, User Research\nExperience: built dashboards, led design system rollout, collaborated with product managers, shipped analytics features\nEducation: BS Computer Science",
+      parsedName: "Taylor Morgan",
+      parsedEmail: "demo@almijobfinder.dev",
+      parsedPhone: "555-010-2001",
+      skills: ["TypeScript", "React", "Node.js", "Prisma", "Figma", "User Research"],
+      experienceKeywords: ["dashboard", "design system", "analytics", "collaboration"],
+      educationKeywords: ["computer science"],
+      preferredRoles: ["Product Designer", "Frontend Engineer", "Product Engineer"]
+    }
+  });
+
+  await prisma.savedSearch.create({
+    data: {
+      userId: demo.id,
+      name: "Remote product roles",
+      querySnapshot: {
+        desiredTitle: "Product Designer",
+        keyword: "figma design systems remote",
+        company: "Atlas",
+        country: "United States",
+        remoteMode: "REMOTE"
+      },
+      alertsEnabled: true
     }
   });
 

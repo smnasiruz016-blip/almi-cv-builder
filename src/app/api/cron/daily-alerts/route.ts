@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { jsonError } from "@/lib/http";
 import { processDailyAlerts } from "@/server/services/alerts";
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("Authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET ?? ""}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+export async function POST(request: Request) {
+  const expected = process.env.CRON_SECRET;
+  const provided = request.headers.get("x-cron-secret");
+
+  if (expected && provided !== expected) {
+    return jsonError("Unauthorized.", 401);
   }
+
   const result = await processDailyAlerts();
-  return NextResponse.json(result);
+  return Response.json(result);
 }
