@@ -1,0 +1,4 @@
+export const RemoteOKConfig = { enabled: process.env.REMOTE_OK_ENABLED !== "false", apiUrl: process.env.REMOTE_OK_API_URL ?? "https://remoteok.com/api", revalidateSeconds: parseInt(process.env.REMOTE_OK_REVALDITATE_SECONDS ?? "720") };
+export const RemotiveConfig = { enabled: process.env.REMOTIVE_ENABLED !== "false", apiUrl: process.env.REMOTIVE_API_URL ?? "https://remotive.com/api/remote-jobs", revalidateSeconds: parseInt(process.env.REMOTIVE_REVALIDATE_SECONDS ?? "1800") };
+export const AdzunaConfig = { enabled: process.env.ADZUNA_ENABLED !== "false" && !!process.env.ADZUNA_APP_ID && !!process.env.ADZUNA_APP_KEY, apiUrl: process.env.ADZUNA_API_URL ?? "https://api.adzuna.com", appId: process.env.ADZUNA_APP_ID ?? "", appKey: process.env.ADZUNA_APP_KEY ?? "" };
+export const MockConfig = { fallbackEnabled: process.env.MOCK_FALLBACK_ENABLED !== "false" };
