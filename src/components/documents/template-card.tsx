@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { ArrowRight, LockKeyhole, Sparkles } from "lucide-react";
 import type { CoverLetterTemplateConfig, ResumeTemplateConfig } from "@/types/documents";
 import { TemplatePreviewThumbnail } from "@/components/documents/template-preview-thumbnail";
+import { BRAND_BUTTON_CLASSES } from "@/components/ui/button";
 import { getTemplatePresentation } from "@/lib/template-presentation";
 
 type TemplateCardProps = {
@@ -116,8 +117,7 @@ export function TemplateCard({ template, href, premiumLocked = false }: Template
             </p>
           </div>
           <div
-            className="inline-flex items-center gap-2 text-sm font-semibold transition group-hover:translate-x-0.5"
-            style={{ color: premiumLocked ? "#7c3aed" : template.theme.accent }}
+            className={`${BRAND_BUTTON_CLASSES} gap-2 rounded-2xl px-5 py-3 text-sm font-semibold group-hover:translate-x-0.5`}
           >
             {premiumLocked ? "Upgrade" : "Use template"}
             <ArrowRight className="h-4 w-4" />
