@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, FileText, PenSquare, Sparkles } from "lucide-react";
+import { BRAND_BUTTON_CLASSES } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 
 const benefits = [
@@ -65,15 +66,14 @@ export default async function HomePage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href={primaryHref}
-                className="inline-flex items-center gap-2 rounded-full bg-teal-700 px-5 py-3 font-medium text-white transition hover:bg-teal-800"
-                style={{ color: "#ffffff" }}
+                className={`${BRAND_BUTTON_CLASSES} gap-2 rounded-full px-5 py-3 font-medium`}
               >
-                <span style={{ color: "#ffffff" }}>Build your CV</span>
+                Build your CV
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href="/templates?kind=resume"
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className={`${BRAND_BUTTON_CLASSES} rounded-full px-5 py-3 font-medium`}
               >
                 Browse templates
               </Link>

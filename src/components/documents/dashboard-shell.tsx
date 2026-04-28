@@ -5,7 +5,7 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { FileText, Sparkles, Wand2 } from "lucide-react";
 import { DocumentEmptyState } from "@/components/documents/document-empty-state";
-import { Button } from "@/components/ui/button";
+import { Button, BRAND_BUTTON_CLASSES } from "@/components/ui/button";
 import { getTemplateTierLabel } from "@/server/services/document-service";
 import type { BuilderPlanSnapshot } from "@/types/documents";
 
@@ -166,13 +166,13 @@ export function DashboardShell({ userName, resumes, coverLetters, plan }: Dashbo
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/templates?kind=resume"
-              className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className={`${BRAND_BUTTON_CLASSES} rounded-2xl px-5 py-3 text-sm font-semibold`}
             >
               Create CV
             </Link>
             <Link
               href="/templates?kind=coverLetter"
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className={`${BRAND_BUTTON_CLASSES} rounded-2xl px-5 py-3 text-sm font-semibold`}
             >
               Create cover letter
             </Link>

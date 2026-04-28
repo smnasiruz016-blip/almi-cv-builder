@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { FilePlus2 } from "lucide-react";
+import { BRAND_BUTTON_CLASSES } from "@/components/ui/button";
 
 type DocumentEmptyStateProps = {
   title: string;
@@ -19,7 +20,7 @@ export function DocumentEmptyState({ title, description, href, ctaLabel }: Docum
       <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-600">{description}</p>
       <Link
         href={href}
-        className="mt-6 inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+        className={`mt-6 ${BRAND_BUTTON_CLASSES} rounded-2xl px-5 py-3 text-sm font-semibold`}
       >
         {ctaLabel}
       </Link>
